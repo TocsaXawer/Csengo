@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Csengetési Rend Szerkesztése{% endblock %}
+{% block content %}
+<form method="POST" action="{{ url_for('edit_schedule', schedule_id=schedule_type.id) }}" enctype="multipart/form-data">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>"{{ schedule_type.name }}" szerkesztése</h2>
+        <div>
+            <a href="{{ url_for('admin_schedules') }}" class="btn btn-secondary">Vissza</a>
+            <button type="submit" class="btn btn-primary">Módosítások mentése</button>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">Időszakok</div>
+                <div class="card-body">
+                    <div id="periods-container">
+                        {% for period in periods %}
+                        <div class="row period-row align-items-center mb-2">
+                            <div class="col-auto"><i class="bi bi-grip-vertical" style="cursor: move;"></i></div>
+                            <div class="col"><input type="text" name="period_name[]" class="form-control" placeholder="Időszak neve" value="{{ period.name }}" required></div>
+                            <div class="col"><input type="time" name="start_time[]" class="form-control" value="{{ period.start }}" required></div>
+                            <div class="col"><input type="time" name="end_time[]" class="form-control" value="{{ period.end }}" required></div>
+                            <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remove-period-btn"><i class="bi bi-x-lg"></i></button></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" id="add-period-btn" class="btn btn-outline-secondary mt-3"><i class="bi bi-plus-circle"></i> Új időszak</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">Becsengetés hangja</div>
+                <div class="card-body">
+                    <p>Jelenlegi: <strong>{{ schedule_type.start_bell_filename or 'Nincs' }}</strong></p>
+                    {% if schedule_type.start_bell_filename %}
+                        <audio controls src="{{ url_for('serve_upload', filename=schedule_type.start_bell_filename) }}" class="w-100"></audio>
+                    {% endif %}
+                    <div class="mt-3">
+                        <label for="start_bell_file" class="form-label">Új hang feltöltése (MP3)</label>
+                        <input class="form-control" type="file" name="start_bell_file" accept=".mp3">
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header">Kicsengetés hangja</div>
+                <div class="card-body">
+                    <p>Jelenlegi: <strong>{{ schedule_type.end_bell_filename or 'Nincs' }}</strong></p>
+                    {% if schedule_type.end_bell_filename %}
+                        <audio controls src="{{ url_for('serve_upload', filename=schedule_type.end_bell_filename) }}" class="w-100"></audio>
+                    {% endif %}
+                    <div class="mt-3">
+                        <label for="end_bell_file" class="form-label">Új hang feltöltése (MP3)</label>
+                        <input class="form-control" type="file" name="end_bell_file" accept=".mp3">
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Jelzőcsengő hangja</div>
+                <div class="card-body">
+                    <p>Jelenlegi: <strong>{{ schedule_type.signal_bell_filename or 'Nincs' }}</strong></p>
+                    {% if schedule_type.signal_bell_filename %}
+                        <audio controls src="{{ url_for('serve_upload', filename=schedule_type.signal_bell_filename) }}" class="w-100"></audio>
+                    {% endif %}
+                    <div class="mt-3">
+                        <label for="signal_bell_file" class="form-label">Új hang feltöltése (MP3)</label>
+                        <input class="form-control" type="file" name="signal_bell_file" accept=".mp3">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div id="period-template" style="display: none;">
+    <div class="row period-row align-items-center mb-2">
+        <div class="col-auto"><i class="bi bi-grip-vertical" style="cursor: move;"></i></div>
+        <div class="col"><input type="text" name="period_name[]" class="form-control" placeholder="Időszak neve" required></div>
+        <div class="col"><input type="time" name="start_time[]" class="form-control" required></div>
+        <div class="col"><input type="time" name="end_time[]" class="form-control" required></div>
+        <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remove-period-btn"><i class="bi bi-x-lg"></i></button></div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('periods-container');
+    new Sortable(container, { animation: 150, handle: '.bi-grip-vertical', ghostClass: 'bg-light' });
+    document.getElementById('add-period-btn').addEventListener('click', function() {
+        const clone = document.getElementById('period-template').firstElementChild.cloneNode(true);
+        container.appendChild(clone);
+    });
+    container.addEventListener('click', function(e) {
+        if (e.target && (e.target.matches('.remove-period-btn') || e.target.closest('.remove-period-btn'))) {
+            e.target.closest('.period-row').remove();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Naptár Kezelése{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .calendar-table {
+        width: 100%;
+        text-align: center;
+        table-layout: fixed;
+    }
+    .calendar-table th {
+        background-color: #f2f2f2;
+        padding: 0.75rem 0;
+        font-weight: bold;
+    }
+    .calendar-table td {
+        height: 120px;
+        border: 1px solid #ddd;
+        vertical-align: top;
+        padding: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        overflow: hidden;
+    }
+    .calendar-table td:hover {
+        background-color: #e9ecef;
+    }
+    .day-number {
+        font-size: 1.1rem;
+        font-weight: bold;
+        text-align: left;
+    }
+    .other-month {
+        background-color: #f8f9fa;
+    }
+    .other-month .day-number {
+        color: #ccc;
+    }
+    .today {
+        background-color: #fff3cd;
+        border: 2px solid #ffeeba;
+    }
+    .event-info {
+        font-size: 0.8rem;
+        background-color: #0d6efd;
+        color: white;
+        padding: 3px 5px;
+        border-radius: 4px;
+        display: block;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+        <a href="{{ url_for('admin_calendar', year=prev_month.year, month=prev_month.month) }}" class="btn btn-outline-primary">&laquo; Előző</a>
+        <h2 class="mb-0 h4">{{ month_name }} {{ year }}</h2>
+        <a href="{{ url_for('admin_calendar', year=next_month.year, month=next_month.month) }}" class="btn btn-outline-primary">Következő &raquo;</a>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bordered calendar-table mb-0">
+            <thead>
+                <tr>
+                    {% for weekday in ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat', 'Vasárnap'] %}
+                        <th>{{ weekday }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in calendar_weeks %}
+                    <tr>
+                        {% for day in week %}
+                            {% set full_date = day.strftime('%Y-%m-%d') %}
+                            {% set event = events.get(full_date) %}
+                            <td 
+                                class="calendar-day 
+                                {% if day.month != month %}other-month{% endif %} 
+                                {% if day == today %}today{% endif %}"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#eventModal"
+                                data-date="{{ full_date }}"
+                                data-schedule-id="{{ event.schedule_type_id if event else '' }}"
+                                data-description="{{ event.description if event else '' }}">
+                                
+                                <div class="day-number">{{ day.day }}</div>
+                                {% if event %}
+                                    <span class="event-info" title="{{ event.schedule_type.name }} - {{ event.description }}">
+                                        {{ event.schedule_type.name }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Event Modal -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eventModalLabel">Nap beállítása</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="eventDate">
+        <div class="mb-3">
+            <label for="scheduleSelect" class="form-label">Csengetési Rend</label>
+            <select id="scheduleSelect" class="form-select">
+                <option value="">-- Válasszon --</option>
+                {% for st in schedule_types %}
+                    <option value="{{ st.id }}">{{ st.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="eventDescription" class="form-label">Leírás (opcionális)</label>
+            <input type="text" id="eventDescription" class="form-control" placeholder="Pl. Sportnap">
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-danger" id="deleteEventBtn">Hozzárendelés törlése</button>
+        <div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Mégse</button>
+            <button type="button" class="btn btn-primary" id="saveEventBtn">Mentés</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const eventModalEl = document.getElementById('eventModal');
+    if (!eventModalEl) return;
+
+    const eventModal = new bootstrap.Modal(eventModalEl);
+    const dateInput = document.getElementById('eventDate');
+    const scheduleSelect = document.getElementById('scheduleSelect');
+    const descriptionInput = document.getElementById('eventDescription');
+    const modalLabel = document.getElementById('eventModalLabel');
+    const deleteBtn = document.getElementById('deleteEventBtn');
+
+    eventModalEl.addEventListener('show.bs.modal', function (event) {
+        const dayCell = event.relatedTarget;
+        const date = dayCell.dataset.date;
+        const scheduleId = dayCell.dataset.scheduleId;
+        const description = dayCell.dataset.description;
+
+        dateInput.value = date;
+        modalLabel.innerText = date + ' - Nap beállítása';
+        
+        scheduleSelect.value = scheduleId || '';
+        descriptionInput.value = description || '';
+
+        if (scheduleId) {
+            deleteBtn.style.display = 'inline-block';
+        } else {
+            deleteBtn.style.display = 'none';
+        }
+    });
+
+    document.getElementById('saveEventBtn').addEventListener('click', function() {
+        const eventData = {
+            date: dateInput.value,
+            schedule_type_id: scheduleSelect.value,
+            description: descriptionInput.value
+        };
+
+        if (!eventData.schedule_type_id) {
+            alert('Kérjük, válasszon csengetési rendet!');
+            return;
+        }
+
+        fetch('/api/calendar_events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Hiba a mentés során: ' + (data.message || 'Ismeretlen hiba.'));
+            }
+        });
+    });
+
+    deleteBtn.addEventListener('click', function() {
+        if (!confirm('Biztosan törli a beállítást erről a napról?')) return;
+        
+        const eventData = { date: dateInput.value };
+
+        fetch('/api/calendar_events/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Hiba a törlés során: ' + (data.message || 'Ismeretlen hiba.'));
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

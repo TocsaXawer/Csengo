@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Felhasználók Kezelése{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header"><h4 class="mb-0">Új felhasználó hozzáadása</h4></div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_users') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Felhasználónév</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Jelszó</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Szerepkörök</label>
+                        {% for role in roles %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="roles" value="{{ role.id }}" id="role-{{ role.id }}">
+                            <label class="form-check-label" for="role-{{ role.id }}">{{ role.name }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="d-grid"><button type="submit" class="btn btn-primary">Felhasználó létrehozása</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+             <div class="card-header"><h4 class="mb-0">Jelenlegi felhasználók</h4></div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Felhasználónév</th>
+                                <th>Szerepkörök</th>
+                                <th>Műveletek</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>
+                                    {% for role in user.roles %}
+                                        <span class="badge bg-secondary">{{ role.name }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-pencil-square"></i> Szerkesztés
+                                    </a>
+                                    {% if user.id != current_user.id %}
+                                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Biztosan törölni szeretné ezt a felhasználót: {{ user.username }}?');">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="bi bi-trash"></i> Törlés
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Csengetési Rendek Kezelése{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Csengetési Rendek</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+        <i class="bi bi-plus-circle"></i> Új Rend Hozzáadása
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if schedule_types %}
+            <ul class="list-group list-group-flush">
+                {% for schedule in schedule_types %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">{{ schedule.name }}</h5>
+                            <small class="text-muted">{{ (schedule.periods|fromjson)|length }} időszak</small>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('edit_schedule', schedule_id=schedule.id) }}" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="bi bi-pencil-square"></i> Szerkesztés
+                            </a>
+                            {% if schedule.name != 'Normál' %}
+                            <form action="{{ url_for('delete_schedule', schedule_id=schedule.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Biztosan törölni szeretné ezt a csengetési rendet?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash"></i> Törlés
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-center text-muted">Még nincsenek csengetési rendek létrehozva.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal fade" id="addScheduleModal" tabindex="-1" aria-labelledby="addScheduleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addScheduleModalLabel">Új Csengetési Rend</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('admin_schedules') }}" method="POST">
+          <div class="modal-body">
+            <div class="mb-3">
+                <label for="name" class="form-label">Csengetési Rend Neve</label>
+                <input type="text" class="form-control" id="name" name="name" placeholder="Pl. Rövidített nap" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Mégse</button>
+            <button type="submit" class="btn btn-primary">Létrehozás</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

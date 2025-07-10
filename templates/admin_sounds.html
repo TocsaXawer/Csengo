@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Hangok Kezelése{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header"><h4>Csengetés hangja</h4></div>
+            <div class="card-body">
+                <p>Jelenlegi fájl: <strong>{{ main_bell.value if main_bell and main_bell.value else 'Nincs beállítva' }}</strong></p>
+                {% if main_bell and main_bell.value %}
+                    <audio id="main-bell-audio" controls src="{{ url_for('serve_upload', filename=main_bell.value) }}" class="w-100"></audio>
+                    <button id="test-main-bell" class="btn btn-secondary mt-2"><i class="bi bi-play-circle"></i> Teszt</button>
+                {% else %}
+                     <div class="alert alert-warning small">Nincs hangfájl feltöltve.</div>
+                {% endif %}
+                <hr>
+                <form action="{{ url_for('admin_sounds') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="main_bell_file" class="form-label">Új csengetés hang feltöltése (MP3)</label>
+                        <input class="form-control" type="file" id="main_bell_file" name="main_bell_file" accept=".mp3">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Feltöltés</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header"><h4>Jelzőcsengő hangja</h4></div>
+            <div class="card-body">
+                <p>Jelenlegi fájl: <strong>{{ signal_bell.value if signal_bell and signal_bell.value else 'Nincs beállítva' }}</strong></p>
+                {% if signal_bell and signal_bell.value %}
+                    <audio id="signal-bell-audio" controls src="{{ url_for('serve_upload', filename=signal_bell.value) }}" class="w-100"></audio>
+                    <button id="test-signal-bell" class="btn btn-secondary mt-2"><i class="bi bi-play-circle"></i> Teszt</button>
+                {% else %}
+                     <div class="alert alert-warning small">Nincs hangfájl feltöltve.</div>
+                {% endif %}
+                <hr>
+                <form action="{{ url_for('admin_sounds') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="signal_bell_file" class="form-label">Új jelzőcsengő hang feltöltése (MP3)</label>
+                        <input class="form-control" type="file" id="signal_bell_file" name="signal_bell_file" accept=".mp3">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Feltöltés</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mainBellAudio = document.getElementById('main-bell-audio');
+    const signalBellAudio = document.getElementById('signal-bell-audio');
+    const testMainBellBtn = document.getElementById('test-main-bell');
+    const testSignalBellBtn = document.getElementById('test-signal-bell');
+
+    if (testMainBellBtn) {
+        testMainBellBtn.addEventListener('click', () => {
+            if(mainBellAudio && mainBellAudio.src) {
+                mainBellAudio.currentTime = 0;
+                mainBellAudio.play();
+            }
+        });
+    }
+
+    if (testSignalBellBtn) {
+        testSignalBellBtn.addEventListener('click', () => {
+            if(signalBellAudio && signalBellAudio.src) {
+                signalBellAudio.currentTime = 0;
+                signalBellAudio.play();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Eszközök Állapota{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="mb-0">P2P Eszközök Állapota</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Itt láthatók azok az eszközök, amelyek "P2P Eszköz" típusú API kulccsal rendelkeznek. Az állapot 10 másodpercenként automatikusan frissül.</p>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Eszköz neve</th>
+                        <th>Státusz</th>
+                        <th>Utoljára látva (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody id="device-status-table">
+                    <!-- A tartalom JavaScript-tel lesz feltöltve -->
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Töltés...</span>
+                            </div>
+                            Adatok betöltése...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('device-status-table');
+
+    function fetchAndUpdateDeviceList() {
+        fetch(window.location.origin + '/api/p2p-devices')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Hálózati hiba: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(devices => {
+                // Táblázat törlése
+                tableBody.innerHTML = '';
+
+                if (devices.length === 0) {
+                    const row = tableBody.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 3;
+                    cell.className = 'text-center text-muted';
+                    cell.textContent = 'Nincsenek P2P típusú eszközök regisztrálva.';
+                    return;
+                }
+
+                devices.forEach(device => {
+                    const row = tableBody.insertRow();
+                    
+                    const nameCell = row.insertCell();
+                    nameCell.textContent = device.name;
+
+                    const statusCell = row.insertCell();
+                    const statusBadge = document.createElement('span');
+                    statusBadge.className = 'badge';
+                    if (device.status === 'Online') {
+                        statusBadge.classList.add('bg-success');
+                    } else {
+                        statusBadge.classList.add('bg-danger');
+                    }
+                    statusBadge.textContent = device.status;
+                    statusCell.appendChild(statusBadge);
+
+                    const lastSeenCell = row.insertCell();
+                    lastSeenCell.textContent = device.last_seen;
+                });
+            })
+            .catch(error => {
+                console.error('Hiba az eszközök állapotának lekérdezésekor:', error);
+                tableBody.innerHTML = '';
+                const row = tableBody.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 3;
+                cell.className = 'text-center text-danger';
+                cell.textContent = 'Hiba történt az adatok betöltése közben.';
+            });
+    }
+
+    // Azonnali frissítés az oldal betöltésekor
+    fetchAndUpdateDeviceList();
+
+    // Státusz frissítése 10 másodpercenként
+    setInterval(fetchAndUpdateDeviceList, 10000);
+});
+</script>
+{% endblock %}

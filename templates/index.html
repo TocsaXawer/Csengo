@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Mai Csengetési Rend{% endblock %}
+{% block content %}
+<div class="card text-center">
+    <div class="card-header bg-white border-0 pt-4">
+        <h1 class="display-4" id="live-clock">--:--:--</h1>
+        <p class="lead text-muted">{{ now().strftime('%Y. %B %d.') }}, {{ ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat', 'Vasárnap'][now().weekday()] }}</p>
+    </div>
+    <div class="card-body">
+        <h4 class="card-title">{{ schedule_name or "Nincs adat" }}</h4>
+        <p class="card-text mb-4">{{ description or "A mai napra nincs beállított csengetési rend." }}</p>
+        
+        {% if schedule_name == 'Nincs csengetés' %}
+            <div class="alert alert-info" role="alert">
+                <i class="bi bi-bell-slash-fill fs-1"></i>
+                <h4 class="alert-heading mt-2">Nincs csengetés</h4>
+                <p class="mb-0">A mai napon a csengetés szünetel.</p>
+            </div>
+        {% elif periods %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead><tr><th>Időszak</th><th>Kezdés</th><th>Vége</th></tr></thead>
+                    <tbody id="schedule-table-body">
+                        {% for period in periods %}
+                            <tr data-start="{{ period.start }}" data-end="{{ period.end }}">
+                                <td>{{ period.name }}</td><td>{{ period.start }}</td><td>{{ period.end }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-warning" role="alert">Ehhez a naphoz nem tartozik órarend.</div>
+        {% endif %}
+    </div>
+    {% if current_user.is_authenticated and current_user.can(Permission.EDIT_SCHEDULE) %}
+    <div class="card-footer text-muted">
+        <button id="test-start-bell" class="btn btn-secondary btn-sm"><i class="bi bi-play-circle"></i> Becsengetés teszt</button>
+        <button id="test-end-bell" class="btn btn-secondary btn-sm"><i class="bi bi-play-circle"></i> Kicsengetés teszt</button>
+        <button id="test-signal-bell" class="btn btn-secondary btn-sm"><i class="bi bi-play-circle"></i> Jelzőcsengő teszt</button>
+    </div>
+    {% endif %}
+</div>
+<audio id="start-bell-audio" src="{{ start_bell_url or '' }}" preload="auto"></audio>
+<audio id="end-bell-audio" src="{{ end_bell_url or '' }}" preload="auto"></audio>
+<audio id="signal-bell-audio" src="{{ signal_bell_url or '' }}" preload="auto"></audio>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Hangfájlok és periódusok beolvasása
+    const startBell = document.getElementById('start-bell-audio');
+    const endBell = document.getElementById('end-bell-audio');
+    const signalBell = document.getElementById('signal-bell-audio');
+    const periods = {{ periods|tojson|safe }};
+
+    // Automatikus lejátszási logika
+    function checkAndPlayBells() {
+        const now = new Date();
+        const currentTimeHHMMSS = now.toTimeString().substring(0, 8); // "HH:MM:SS" formátum
+
+        for (const period of periods) {
+            // Becsengetés lejátszása a perc elején (pl. 08:00:00-kor)
+            if (period.start + ':00' === currentTimeHHMMSS) {
+                console.log("Lejátszás: Becsengetés -", period.name);
+                if (startBell && startBell.src) startBell.play().catch(e => console.error("Hiba a becsengetés lejátszásakor:", e));
+            }
+
+            // Kicsengetés lejátszása a perc elején
+            if (period.end + ':00' === currentTimeHHMMSS) {
+                console.log("Lejátszás: Kicsengetés -", period.name);
+                if (endBell && endBell.src) endBell.play().catch(e => console.error("Hiba a kicsengetés lejátszásakor:", e));
+            }
+
+            // Jelzőcsengő lejátszása (1 perccel a vége előtt)
+            const end_time_parts = period.end.split(':');
+            let end_hour = parseInt(end_time_parts[0]);
+            let end_minute = parseInt(end_time_parts[1]);
+            let signal_minute = end_minute - 1;
+            let signal_hour = end_hour;
+            if (signal_minute < 0) {
+                signal_minute = 59;
+                signal_hour -= 1;
+                if (signal_hour < 0) { signal_hour = 23; }
+            }
+            const signalTime = ('0' + signal_hour).slice(-2) + ':' + ('0' + signal_minute).slice(-2);
+            if (signalTime + ':00' === currentTimeHHMMSS) {
+                console.log("Lejátszás: Jelzőcsengő -", period.name);
+                if (signalBell && signalBell.src) signalBell.play().catch(e => console.error("Hiba a jelzőcsengő lejátszásakor:", e));
+            }
+        }
+    }
+
+    // Tesztgombok kezelése, ha a felhasználó be van jelentkezve és joga van hozzá
+    const testStartBtn = document.getElementById('test-start-bell');
+    const testEndBtn = document.getElementById('test-end-bell');
+    const testSignalBtn = document.getElementById('test-signal-bell');
+
+    if(testStartBtn) testStartBtn.addEventListener('click', () => { if(startBell.src) startBell.play(); else alert('Nincs beállítva becsengetés hang.'); });
+    if(testEndBtn) testEndBtn.addEventListener('click', () => { if(endBell.src) endBell.play(); else alert('Nincs beállítva kicsengetés hang.'); });
+    if(testSignalBtn) testSignalBtn.addEventListener('click', () => { if(signalBell.src) signalBell.play(); else alert('Nincs beállítva jelzőcsengő hang.'); });
+
+    // Óra frissítése és a jelenlegi időszak kiemelése
+    const clockElement = document.getElementById('live-clock');
+    const scheduleTableBody = document.getElementById('schedule-table-body');
+    function updateClockAndHighlight() {
+        const localTime = new Date().toTimeString().substring(0, 8);
+        if (clockElement) { clockElement.textContent = localTime; }
+
+        if (scheduleTableBody) {
+            const rows = scheduleTableBody.getElementsByTagName('tr');
+            for (let row of rows) {
+                const start = row.dataset.start;
+                const end = row.dataset.end;
+                const localTimeHHMM = localTime.substring(0, 5);
+                if (localTimeHHMM >= start && localTimeHHMM < end) {
+                    row.classList.add('current-period');
+                } else {
+                    row.classList.remove('current-period');
+                }
+            }
+        }
+    }
+    
+    // Futtatás másodpercenként
+    setInterval(checkAndPlayBells, 1000);
+    setInterval(updateClockAndHighlight, 1000);
+    updateClockAndHighlight(); // Azonnali frissítés betöltéskor
+});
+</script>
+{% endblock %}

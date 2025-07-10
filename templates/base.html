@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="hu">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Iskolai Csengetési Rend{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style> body { background-color: #f8f9fa; } </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}"><i class="bi bi-bell-fill"></i> Iskolai Csengetés</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Főoldal</a></li>
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ current_user.username }}
+                          </a>
+                          <ul class="dropdown-menu dropdown-menu-end">
+                            {% if current_user.can(Permission.EDIT_SCHEDULE) %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_schedules') }}">Csengetési Rendek</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin_calendar') }}">Naptár</a></li>
+                            {% endif %}
+                            {% if current_user.can(Permission.MANAGE_USERS) %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Felhasználók</a></li>
+                            {% endif %}
+                            {% if current_user.is_admin() %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_api_keys') }}">API Kulcsok</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin_p2p_status') }}">Eszközök Állapota</a></li>
+                            {% endif %}
+                            {% if current_user.can(Permission.VIEW_LOGS) %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_logs') }}">Napló</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Jelszó módosítása</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Kijelentkezés</a></li>
+                          </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Bejelentkezés</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

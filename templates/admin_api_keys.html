@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}API Kulcsok Kezelése{% endblock %}
+{% block content %}
+{% if new_key %}
+<div class="alert alert-success" role="alert">
+    <h4 class="alert-heading">Új API kulcs létrehozva: "{{ new_key_name }}"</h4>
+    <p>A kulcsot biztonsági okokból csak most jelenítjük meg. Kérjük, másolja ki és tárolja biztonságos helyen.</p><hr>
+    <div class="input-group">
+        <input type="text" class="form-control" value="{{ new_key }}" id="newApiKey" readonly>
+        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('newApiKey')"><i class="bi bi-clipboard"></i> Másolás</button>
+    </div>
+</div>
+{% endif %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header"><h4 class="mb-0">Új API kulcs generálása</h4></div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_api_keys') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Eszköz neve</label>
+                        <input type="text" class="form-control" id="name" name="name" placeholder="Pl. ESP32 Kijelző" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kulcs típusa</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="key_type" id="type_query" value="query" checked>
+                            <label class="form-check-label" for="type_query">Lekérdező (pl. ESP32 adatlekérés)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="key_type" id="type_p2p" value="p2p">
+                            <label class="form-check-label" for="type_p2p">P2P Eszköz (Jelenlét jelzés)</label>
+                        </div>
+                    </div>
+                    <div class="d-grid"><button type="submit" class="btn btn-primary">Kulcs generálása</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+             <div class="card-header"><h4 class="mb-0">Meglévő API kulcsok</h4></div>
+            <div class="card-body">
+                {% if api_keys %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead><tr><th>Név</th><th>Típus</th><th>Létrehozva</th><th>Műveletek</th></tr></thead>
+                        <tbody>
+                            {% for key in api_keys %}
+                            <tr>
+                                <td>{{ key.name }}</td>
+                                <td><span class="badge bg-info">{{ key.key_type }}</span></td>
+                                <td>{{ key.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <form action="{{ url_for('delete_api_key', key_id=key.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Biztosan törölni szeretné ezt az API kulcsot: {{ key.name }}?');">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Törlés</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <p class="text-center text-muted">Még nincsenek API kulcsok generálva.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+function copyToClipboard(elementId) {
+    var copyText = document.getElementById(elementId);
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value).then(function() {
+        alert("API kulcs a vágólapra másolva!");
+    }, function(err) {
+        try {
+            document.execCommand('copy');
+            alert("API kulcs a vágólapra másolva!");
+        } catch (err) {
+            alert('Hoppá, a másolás nem sikerült.');
+        }
+    });
+}
+</script>
+{% endblock %}
