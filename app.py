@@ -215,6 +215,126 @@ def get_todays_schedule():
             schedule_type.end_bell_filename, 
             schedule_type.signal_bell_filename)
 
+### ÚJ ###
+# Dekorátor a P2P eszközök API kulcsának ellenőrzésére
+def p2p_api_key_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key_header = request.headers.get('X-API-Key')
+        if not api_key_header:
+            return jsonify({'message': 'Hiányzó API kulcs (X-API-Key header).'}), 401
+        
+        api_key = ApiKey.query.filter_by(key=api_key_header, key_type='p2p').first()
+        if not api_key:
+            return jsonify({'message': 'Érvénytelen vagy nem P2P típusú API kulcs.'}), 403
+        
+        # A dekorátor átadja az api_key objektumot a route-nak
+        return f(api_key=api_key, *args, **kwargs)
+    return decorated_function
+
+# Függvény, amely megkeresi a legközelebbi csengetési időpontot a jövőben.
+def get_next_ringing_info():
+    now = datetime.now()
+    # Keressük a következő csengetést max 1 évig előre.
+    for day_offset in range(366):
+        target_day = now.date() + timedelta(days=day_offset)
+        target_day_str = target_day.strftime('%Y-%m-%d')
+
+        # Csengetési rend meghatározása az adott napra
+        event = CalendarEvent.query.filter_by(date=target_day_str).first()
+        if event:
+            schedule_type = event.schedule_type
+        else:
+            if target_day.weekday() >= 5: # Hétvége
+                schedule_type = ScheduleType.query.filter_by(name='Nincs csengetés').first()
+            else: # Hétköznap
+                schedule_type = ScheduleType.query.filter_by(name='Normál').first()
+
+        if not schedule_type or not schedule_type.periods:
+            continue
+
+        try:
+            periods = json.loads(schedule_type.periods)
+            if not periods: continue
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        # Események (időpont + típus) összegyűjtése az adott napra
+        events_for_day = []
+        for period in periods:
+            if period.get('start'):
+                events_for_day.append({'time_str': period['start'], 'type': 'start'})
+            if period.get('end'):
+                events_for_day.append({'time_str': period['end'], 'type': 'end'})
+        
+        future_ringings_on_day = []
+        for event_data in events_for_day:
+            try:
+                hour, minute = map(int, event_data['time_str'].split(':'))
+                ringing_datetime = datetime.combine(target_day, datetime.min.time()).replace(hour=hour, minute=minute)
+                
+                if ringing_datetime > now:
+                    future_ringings_on_day.append({
+                        'time': ringing_datetime,
+                        'type': event_data['type']
+                    })
+            except (ValueError, TypeError):
+                continue
+
+        # Ha találtunk jövőbeli eseményt, a legkorábbit visszaadjuk
+        if future_ringings_on_day:
+            # Rendezés idő szerint, hogy biztosan a legközelebbi legyen az első
+            future_ringings_on_day.sort(key=lambda x: x['time'])
+            next_event = future_ringings_on_day[0]
+            
+            return {
+                "next_ringing_time_utc": next_event['time'].isoformat(),
+                "ring_type": next_event['type'], # 'start' vagy 'end'
+                "schedule_name": schedule_type.name,
+                "start_bell_filename": schedule_type.start_bell_filename,
+                "end_bell_filename": schedule_type.end_bell_filename,
+                "signal_bell_filename": schedule_type.signal_bell_filename,
+            }
+    
+    # Ha a ciklus lefutott és nem találtunk semmit
+    return None
+
+### ÚJ ###
+@app.route('/api/p2p/next-ringing')
+@p2p_api_key_required
+def p2p_next_ringing(api_key):
+    """
+    P2P API végpont, amely visszaadja a legközelebbi csengetés időpontját
+    és a hozzá tartozó KICCSENGŐ vagy BECSENGŐ hangfájlt, valamint a jelzőcsengőt.
+    """
+    api_key.last_seen = datetime.utcnow()
+    
+    ringing_info = get_next_ringing_info()
+    
+    db.session.commit()
+
+    if not ringing_info:
+        return jsonify({'message': 'Nincs következő csengetés beütemezve.'}), 404
+
+    # A választípus ('start' vagy 'end') alapján kiválasztjuk a megfelelő hangfájlt
+    main_bell_filename = None
+    if ringing_info['ring_type'] == 'start':
+        main_bell_filename = ringing_info.get('start_bell_filename')
+    elif ringing_info['ring_type'] == 'end':
+        main_bell_filename = ringing_info.get('end_bell_filename')
+
+    # A válasz összeállítása
+    response_data = {
+        'next_ringing_time_utc': ringing_info['next_ringing_time_utc'],
+        'ring_type': ringing_info['ring_type'],
+        'schedule_name': ringing_info['schedule_name'],
+        'main_bell_url': url_for('serve_upload', filename=main_bell_filename, _external=True) if main_bell_filename else None,
+        'signal_bell_url': url_for('serve_upload', filename=ringing_info.get('signal_bell_filename'), _external=True) if ringing_info.get('signal_bell_filename') else None
+    }
+    
+    return jsonify(response_data)
+
+    
 # --- Frontend Routes ---
 @app.route('/')
 def index():
@@ -696,4 +816,4 @@ def init_db_command():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000, host='0.0.0')
+    app.run(debug=True, port=5000, host='0.0.0.0')
